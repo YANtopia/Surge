@@ -361,3 +361,4 @@ USER-AGENT,MicroMessenger*
 IP-CIDR,203.205.136.141/32,no-resolve
 IP-CIDR,101.32.172.165/32,no-resolve
 IP-CIDR,49.51.89.176/32,no-resolve
+IP-CIDR,49.51.89.236/32,no-resolve
