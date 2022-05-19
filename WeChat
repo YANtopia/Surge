@@ -360,7 +360,9 @@ USER-AGENT,MicroMessenger*
 #Myself
 IP-CIDR,49.51.89.176/32,no-resolve
 IP-CIDR,49.51.89.236/32,no-resolve
+IP-CIDR,101.32.139.52/32,no-resolve
 IP-CIDR,101.32.172.165/32,no-resolve
+IP-CIDR,101.32.139.157/32,no-resolve
 IP-CIDR,150.109.3.6/32,no-resolve
 IP-CIDR,150.109.27.63/32,no-resolve
 IP-CIDR,203.205.136.141/32,no-resolve
