@@ -370,6 +370,7 @@ IP-CIDR,150.109.3.6/32,no-resolve
 IP-CIDR,150.109.27.63/32,no-resolve
 IP-CIDR,150.109.91.84/32,no-resolve
 IP-CIDR,150.109.91.98/32,no-resolve
-IP-CIDR,162.62.163.83/32,no-resolve
+IP-CIDR,162.62.163.63/32,no-resolve
+IP-CIDR,162.62.163.82/32,no-resolve
 IP-CIDR,203.205.136.141/32,no-resolve
 
