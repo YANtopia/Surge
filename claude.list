@@ -22,6 +22,7 @@ DOMAIN,anthropic-com.ghost.io
 
 # ── 监控 / 遥测 ───────────────────────────────────────
 DOMAIN-SUFFIX,sentry.io
+DOMAIN-KEYWORD,sentry
 DOMAIN-SUFFIX,statsigapi.net
 DOMAIN,browser-intake-us5-datadoghq.com
 DOMAIN-KEYWORD,datadog
