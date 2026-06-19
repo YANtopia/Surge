@@ -27,6 +27,7 @@ const COLOR_WARN = "#FF9500";
 
 function request(test) {
   return new Promise(resolve => {
+    console.log(`[${test.name}] 开始请求 ${test.url}，出口策略=${POLICY}`);
     const opts = {
       url: test.url,
       timeout: 8,
@@ -42,8 +43,12 @@ function request(test) {
       opts.body = JSON.stringify({ model: "claude-3-haiku", messages: [], max_tokens: 1 });
     }
     $httpClient[method](opts, (err, resp, data) => {
-      if (err) { resolve({ name: test.name, ok: false, detail: "超时/不可达" }); return; }
+      if (err) {
+        console.log(`[${test.name}] ERROR: ${err}`);
+        resolve({ name: test.name, ok: false, detail: "超时/不可达" }); return;
+      }
       const status = resp.status;
+      console.log(`[${test.name}] status=${status}, bodyLen=${(data||"").length}`);
       const body = (data || "").toLowerCase();
       const blocked = body.includes("unavailable") ||
                       body.includes("not available") ||
