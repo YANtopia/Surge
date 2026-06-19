@@ -1,0 +1,11 @@
+#!name=Claude 可用性检测
+#!desc=检测当前出口能否访问 api.anthropic.com 与 claude.ai，显示在面板。点击面板用 Claude 策略组出口重新检测。
+#!category=Panel
+#!system=ios
+
+[Script]
+ClaudeCheck = type=generic,timeout=15,script-path=https://raw.githubusercontent.com/YANtopia/Surge/main/claude-check.js,argument=policy=Claude
+
+[Panel]
+ClaudeCheck = script-name=ClaudeCheck,update-interval=600
+
