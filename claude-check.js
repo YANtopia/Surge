@@ -30,7 +30,7 @@ function request(test) {
     const opts = {
       url: test.url,
       timeout: 8,
-      "policy-descriptor": POLICY,
+      policy: POLICY,
       headers: {
         "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15"
       }
