@@ -1,86 +1,77 @@
 /*
- * Claude 可用性检测面板脚本
- * 检测 api.anthropic.com 与 claude.ai 是否可正常访问
- * 通过指定策略组出口发起请求（默认 Claude 组）
+ * Claude 可用性检测面板（仿 CFGPT 思路）
+ * 原理：请求 claude.ai 的 Cloudflare trace 接口，取出口国家代码，
+ *       用 Anthropic 支持地区白名单判断是否可用。
+ * 不直接打 API、不手动指定 policy —— 走 Surge 规则分流，
+ *   claude.ai 会被你的规则匹配到 Claude 组出口。
  *
- * 判断逻辑：
- *  - Anthropic 对受限地区/机房 IP 会返回封锁页（含 "unavailable" 等标识）或非预期状态码
- *  - API 端点：未授权时正常返回 401（说明网络可达且未被地区封锁），返回 403 + 封锁内容则不可用
- *  - 网页端：正常返回 200/403(Cloudflare challenge)，返回封锁页则不可用
+ * 可选 argument：
+ *   icon=支持时图标  iconerr=不支持时图标
+ *   icon-color=支持时颜色  iconerr-color=不支持时颜色
+ *   title=自定义标题
  */
 
-const POLICY = (typeof $argument !== "undefined" && $argument)
-  ? Object.fromEntries($argument.split("&").map(kv => kv.split("="))).policy || "Claude"
-  : "Claude";
+let url = "http://claude.ai/cdn-cgi/trace";
 
-const TESTS = [
-  { name: "API",     url: "https://api.anthropic.com/v1/messages" },
-  { name: "claude.ai", url: "https://claude.ai/" },
-];
+// Anthropic 官方支持的国家/地区白名单（ISO 3166-1 alpha-2）
+// 来源：Anthropic supported countries，含主要可用区，不含 CN/HK/RU 等受限区
+let supported = ["US","CA","GB","IE","AU","NZ","JP","KR","SG","TW","IN","ID","MY","TH","PH","VN",
+"AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IS","IT","LV","LI","LT","LU",
+"MT","NL","NO","PL","PT","RO","SK","SI","ES","SE","CH","UA","IL","AE","QA","KW","BH","OM","SA",
+"ZA","NG","KE","GH","MX","BR","AR","CL","CO","PE","UY","EC","CR","PA","DO","JM","BS","BB","BZ",
+"FJ","PG","BD","LK","NP","MN","KZ","GE","AM","AZ","MD","BA","MK","ME","RS","AL"];
 
-const ICON_OK   = "checkmark.circle.fill";
-const ICON_FAIL = "xmark.circle.fill";
-const ICON_WARN = "exclamationmark.triangle.fill";
-const COLOR_OK   = "#34C759";
-const COLOR_FAIL = "#FF3B30";
-const COLOR_WARN = "#FF9500";
-
-function request(test) {
-  return new Promise(resolve => {
-    console.log(`[${test.name}] 开始请求 ${test.url}，出口策略=${POLICY}`);
-    const opts = {
-      url: test.url,
-      timeout: 8,
-      policy: POLICY,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15"
-      }
-    };
-    // API 端点用 POST 触发 401，网页端用 GET
-    const method = test.name === "API" ? "post" : "get";
-    if (method === "post") {
-      opts.headers["Content-Type"] = "application/json";
-      opts.body = JSON.stringify({ model: "claude-3-haiku", messages: [], max_tokens: 1 });
-    }
-    $httpClient[method](opts, (err, resp, data) => {
-      if (err) {
-        console.log(`[${test.name}] ERROR: ${err}`);
-        resolve({ name: test.name, ok: false, detail: "超时/不可达" }); return;
-      }
-      const status = resp.status;
-      console.log(`[${test.name}] status=${status}, bodyLen=${(data||"").length}`);
-      const body = (data || "").toLowerCase();
-      const blocked = body.includes("unavailable") ||
-                      body.includes("not available") ||
-                      body.includes("restricted") ||
-                      body.includes("blocked");
-      let ok = false, detail = `HTTP ${status}`;
-      if (test.name === "API") {
-        // 401 = 网络通且未被地区封锁（只是没带 key），算可用
-        ok = (status === 401 || status === 400) && !blocked;
-        if (status === 403 || blocked) detail = "地区受限";
-      } else {
-        // 网页端 200 或 Cloudflare 403 challenge 都算通，封锁页不算
-        ok = (status === 200 || status === 403) && !blocked;
-        if (blocked) detail = "地区受限";
-      }
-      resolve({ name: test.name, ok, detail });
-    });
-  });
+// 解析 argument
+let titlediy, icon, iconerr, iconColor, iconerrColor;
+if (typeof $argument !== 'undefined') {
+  const args = $argument.split('&');
+  for (let i = 0; i < args.length; i++) {
+    const [key, value] = args[i].split('=');
+    if (key === 'title') titlediy = value;
+    else if (key === 'icon') icon = value;
+    else if (key === 'iconerr') iconerr = value;
+    else if (key === 'icon-color') iconColor = value;
+    else if (key === 'iconerr-color') iconerrColor = value;
+  }
 }
 
-(async () => {
-  const results = await Promise.all(TESTS.map(request));
-  const allOk = results.every(r => r.ok);
-  const noneOk = results.every(r => !r.ok);
+$httpClient.get(url, function(error, response, data){
+  if (error) {
+    console.log("Claude trace 请求失败: " + error);
+    $done({
+      title: titlediy || 'Claude 可用性',
+      content: '✖️ 连接失败/超时',
+      icon: iconerr || 'xmark.circle.fill',
+      'icon-color': iconerrColor || '#FF3B30'
+    });
+    return;
+  }
 
-  const title = "Claude 可用性";
-  const content = results.map(r => `${r.name}: ${r.ok ? "✓ 可用" : "✗ " + r.detail}`).join("\n");
+  // 解析 trace 返回（key=value 逐行）
+  let cf = {};
+  (data || "").split("\n").forEach(line => {
+    let [k, v] = line.split("=");
+    if (k) cf[k] = v;
+  });
 
-  let icon, color;
-  if (allOk)      { icon = ICON_OK;   color = COLOR_OK; }
-  else if (noneOk){ icon = ICON_FAIL; color = COLOR_FAIL; }
-  else            { icon = ICON_WARN; color = COLOR_WARN; }
+  let loc = cf.loc || "??";
+  let ip = cf.ip || "";
+  let flag = getFlag(loc);
+  let ok = supported.indexOf(loc) !== -1;
 
-  $done({ title, content, icon, "icon-color": color });
-})();
+  console.log(`Claude trace: loc=${loc}, ip=${ip}, 支持=${ok}`);
+
+  let body = {
+    title: titlediy || 'Claude 可用性',
+    content: ok ? `✔️ 可用   出口: ${flag}${loc}` : `✖️ 区域受限   出口: ${flag}${loc}`,
+    icon: ok ? (icon || 'checkmark.circle.fill') : (iconerr || 'xmark.circle.fill'),
+    'icon-color': ok ? (iconColor || '#34C759') : (iconerrColor || '#FF3B30')
+  };
+  $done(body);
+});
+
+function getFlag(cc){
+  if (!cc || cc.length !== 2) return '';
+  if (cc.toUpperCase() === 'TW') cc = 'CN';
+  return String.fromCodePoint(...cc.toUpperCase().split('').map(c => 127397 + c.charCodeAt()));
+}
